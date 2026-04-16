@@ -1,0 +1,17 @@
+cmake_minimum_required(VERSION 3.16)
+project(system_monitor_plugin)
+set(CMAKE_CXX_STANDARD 20)
+
+add_library(system_monitor SHARED
+    src/SystemMonitorPlugin.cpp
+    src/WatchdogChecker.cpp
+)
+set_target_properties(system_monitor PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    OUTPUT_NAME "system_monitor"
+)
+target_include_directories(system_monitor PRIVATE
+    include
+    \${CMAKE_SOURCE_DIR}
+)
+target_compile_options(system_monitor PRIVATE -Wall -Wextra -fvisibility=hidden)
