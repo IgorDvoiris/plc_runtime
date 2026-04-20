@@ -32,24 +32,25 @@ const std::unordered_map<std::string, TokenType>& Lexer::keywords() {
         {"CALC",  TokenType::CALC},
         {"CALCN", TokenType::CALCN},
         {"RET",   TokenType::RET},
-        {"PROGRAM",              TokenType::KW_PROGRAM},
-        {"END_PROGRAM",          TokenType::KW_END_PROGRAM},
-        {"FUNCTION",             TokenType::KW_FUNCTION},
-        {"END_FUNCTION",         TokenType::KW_END_FUNCTION},
-        {"FUNCTION_BLOCK",       TokenType::KW_FUNCTION_BLOCK},
-        {"END_FUNCTION_BLOCK",   TokenType::KW_END_FUNCTION_BLOCK},
-        {"VAR",                  TokenType::KW_VAR},
-        {"VAR_INPUT",            TokenType::KW_VAR_INPUT},
-        {"VAR_OUTPUT",           TokenType::KW_VAR_OUTPUT},
-        {"VAR_IN_OUT",           TokenType::KW_VAR_IN_OUT},
-        {"END_VAR",              TokenType::KW_END_VAR},
-        {"BOOL",   TokenType::TYPE_BOOL},
-        {"INT",    TokenType::TYPE_INT},
-        {"DINT",   TokenType::TYPE_DINT},
-        {"REAL",   TokenType::TYPE_REAL},
-        {"TIME",   TokenType::TYPE_TIME},
-        {"TRUE",   TokenType::BOOL_LIT},
-        {"FALSE",  TokenType::BOOL_LIT},
+        {"PROGRAM",            TokenType::KW_PROGRAM},
+        {"END_PROGRAM",        TokenType::KW_END_PROGRAM},
+        {"FUNCTION",           TokenType::KW_FUNCTION},
+        {"END_FUNCTION",       TokenType::KW_END_FUNCTION},
+        {"FUNCTION_BLOCK",     TokenType::KW_FUNCTION_BLOCK},
+        {"END_FUNCTION_BLOCK", TokenType::KW_END_FUNCTION_BLOCK},
+        {"VAR",                TokenType::KW_VAR},
+        {"VAR_INPUT",          TokenType::KW_VAR_INPUT},
+        {"VAR_OUTPUT",         TokenType::KW_VAR_OUTPUT},
+        {"VAR_IN_OUT",         TokenType::KW_VAR_IN_OUT},
+        {"END_VAR",            TokenType::KW_END_VAR},
+        {"AT",                 TokenType::KW_AT},   // ← добавлено
+        {"BOOL",               TokenType::TYPE_BOOL},
+        {"INT",                TokenType::TYPE_INT},
+        {"DINT",               TokenType::TYPE_DINT},
+        {"REAL",               TokenType::TYPE_REAL},
+        {"TIME",               TokenType::TYPE_TIME},
+        {"TRUE",               TokenType::BOOL_LIT},
+        {"FALSE",              TokenType::BOOL_LIT},
     };
     return kw;
 }
@@ -74,12 +75,16 @@ void Lexer::skipWhitespaceAndComments() {
         } else if (pos_ + 1 < src_.size() &&
                    src_[pos_] == '(' && src_[pos_+1] == '*') {
             pos_ += 2;
-            while (pos_ + 1 < src_.size() &&
-                   !(src_[pos_] == '*' && src_[pos_+1] == ')')) {
+            // Ищем закрывающий *)
+            while (pos_ < src_.size()) {
+                if (pos_ + 1 < src_.size() &&
+                    src_[pos_] == '*' && src_[pos_+1] == ')') {
+                    pos_ += 2;
+                    break;
+                }
                 if (src_[pos_] == '\n') { ++line_; col_ = 1; }
                 ++pos_;
             }
-            pos_ += 2;
         } else if (pos_ + 1 < src_.size() &&
                    src_[pos_] == '/' && src_[pos_+1] == '/') {
             while (pos_ < src_.size() && src_[pos_] != '\n') ++pos_;
@@ -93,16 +98,28 @@ Token Lexer::nextToken() {
     int startLine = line_, startCol = col_;
     char c = src_[pos_];
 
+    // Числовые литералы
     if (std::isdigit(static_cast<unsigned char>(c)) ||
-        (c == '-' && pos_+1 < src_.size() &&
-         std::isdigit(static_cast<unsigned char>(src_[pos_+1])))) {
+        (c == '-' && pos_ + 1 < src_.size() &&
+         std::isdigit(static_cast<unsigned char>(src_[pos_ + 1])))) {
         return readNumber(startLine, startCol);
     }
+
+    // Строковые литералы
     if (c == '\'') return readString(startLine, startCol);
+
+    // Прямой адрес IO: начинается с '%'
+    if (c == '%') {
+        ++pos_; ++col_; // потребляем '%'
+        return readDirectAddress(startLine, startCol);
+    }
+
+    // Идентификаторы и ключевые слова
     if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
         return readIdentOrKeyword(startLine, startCol);
     }
 
+    // Одиночные символы
     ++pos_; ++col_;
     switch (c) {
         case ':':
@@ -116,7 +133,8 @@ Token Lexer::nextToken() {
         case '(': return {TokenType::LPAREN,    "(", startLine, startCol};
         case ')': return {TokenType::RPAREN,    ")", startLine, startCol};
         default:
-            return {TokenType::UNKNOWN, std::string(1, c), startLine, startCol};
+            return {TokenType::UNKNOWN, std::string(1, c),
+                    startLine, startCol};
     }
 }
 
@@ -134,15 +152,16 @@ Token Lexer::readNumber(int l, int c) {
     }
     std::string val = src_.substr(start, pos_ - start);
     col_ += static_cast<int>(pos_ - start);
-    return {isReal ? TokenType::REAL_LIT : TokenType::INT_LIT, val, l, c};
+    return {isReal ? TokenType::REAL_LIT : TokenType::INT_LIT,
+            val, l, c};
 }
 
 Token Lexer::readString(int l, int c) {
-    ++pos_;
+    ++pos_; // пропустить открывающую '
     size_t start = pos_;
     while (pos_ < src_.size() && src_[pos_] != '\'') ++pos_;
     std::string val = src_.substr(start, pos_ - start);
-    ++pos_;
+    if (pos_ < src_.size()) ++pos_; // пропустить закрывающую '
     return {TokenType::STRING_LIT, val, l, c};
 }
 
@@ -154,8 +173,9 @@ Token Lexer::readIdentOrKeyword(int l, int c) {
     std::string word = src_.substr(start, pos_ - start);
     col_ += static_cast<int>(pos_ - start);
 
+    // Метка: идентификатор за которым сразу ':' (не ':=')
     if (pos_ < src_.size() && src_[pos_] == ':' &&
-        !(pos_+1 < src_.size() && src_[pos_+1] == '=')) {
+        !(pos_ + 1 < src_.size() && src_[pos_ + 1] == '=')) {
         ++pos_; ++col_;
         return {TokenType::LABEL, word, l, c};
     }
@@ -164,4 +184,54 @@ Token Lexer::readIdentOrKeyword(int l, int c) {
     auto it = kw.find(word);
     if (it != kw.end()) return {it->second, word, l, c};
     return {TokenType::IDENTIFIER, word, l, c};
+}
+
+Token Lexer::readDirectAddress(int l, int c) {
+    // pos_ уже указывает на символ после '%'
+    size_t start = pos_ - 1; // включаем '%' в строку токена
+
+    // ── Префикс: I / Q / M ────────────────────────────────────
+    if (pos_ >= src_.size() ||
+        (src_[pos_] != 'I' && src_[pos_] != 'Q' && src_[pos_] != 'M')) {
+        // Не является прямым адресом — возвращаем '%' как UNKNOWN
+        // pos_ уже продвинут в nextToken(), не двигаем дальше
+        return {TokenType::UNKNOWN, "%", l, c};
+    }
+    ++pos_;
+
+    // ── Размер: X / B / W / D (опционально) ──────────────────
+    if (pos_ < src_.size() &&
+        (src_[pos_] == 'X' || src_[pos_] == 'B' ||
+         src_[pos_] == 'W' || src_[pos_] == 'D')) {
+        ++pos_;
+    }
+
+    // ── Адрес байта: одна или более цифр ─────────────────────
+    if (pos_ >= src_.size() ||
+        !std::isdigit(static_cast<unsigned char>(src_[pos_]))) {
+        // Нет цифры — некорректный адрес
+        std::string bad = src_.substr(start, pos_ - start);
+        return {TokenType::UNKNOWN, bad, l, c};
+    }
+    while (pos_ < src_.size() &&
+           std::isdigit(static_cast<unsigned char>(src_[pos_]))) ++pos_;
+
+    // ── Адрес бита: .цифра (опционально) ─────────────────────
+    if (pos_ < src_.size() && src_[pos_] == '.') {
+        size_t dotPos = pos_;
+        ++pos_;
+        if (pos_ < src_.size() &&
+            std::isdigit(static_cast<unsigned char>(src_[pos_]))) {
+            while (pos_ < src_.size() &&
+                   std::isdigit(static_cast<unsigned char>(src_[pos_])))
+                ++pos_;
+        } else {
+            // Точка без цифры — откатываем точку
+            pos_ = dotPos;
+        }
+    }
+
+    std::string val = src_.substr(start, pos_ - start);
+    col_ += static_cast<int>(pos_ - start);
+    return {TokenType::DIRECT_ADDR, val, l, c};
 }

@@ -24,7 +24,11 @@ namespace {
     void signalHandler(int) { g_running = false; }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Ошибка: Неверное количество аргументов!" << std::endl;
+        return 1;
+    }
     std::signal(SIGINT, signalHandler);
     std::cout << "=== Motor Control System + IEC Runtime ===\n\n";
 
@@ -195,7 +199,7 @@ int main() {
         return 1;
     }
 
-    if (!vmRuntime->loadProgram("./pump.plcbc", "PumpControl", "VmTask")) {
+    if (!vmRuntime->loadProgram(argv[1], "PumpControl", "VmTask")) {
         std::cerr << "[Main] loadProgram failed\n";
         destroy(vmPlugin);
         dlclose(vmHandle);

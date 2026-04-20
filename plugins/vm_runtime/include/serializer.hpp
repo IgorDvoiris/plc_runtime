@@ -1,6 +1,6 @@
 // serializer.hpp
 #pragma once
-#include "codegen.hpp"
+#include "../compiler/codegen.hpp"
 #include <string>
 
 #pragma pack(push, 1)

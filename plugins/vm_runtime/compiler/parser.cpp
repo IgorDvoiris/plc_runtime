@@ -1,5 +1,6 @@
 // parser.cpp
 #include "parser.hpp"
+#include "direct_address_parser.hpp"
 #include <stdexcept>
 #include <map>
 
@@ -115,12 +116,30 @@ POU Parser::parsePOU() {
     return pou;
 }
 
+
 VarDecl Parser::parseVarDecl(VarDecl::Kind kind) {
     VarDecl v;
-    v.kind = kind;
+    v.kind             = kind;
+    v.hasDirectAddress = false;
     v.name = expect(TokenType::IDENTIFIER).value;
+
+    // ── Директива AT ──────────────────────────────────────────
+    if (match(TokenType::KW_AT)) {
+        if (!check(TokenType::DIRECT_ADDR))
+            error("Expected direct address (e.g. %IX0.0) after AT"
+                  ", got: '" + peek().value + "'");
+
+        v.hasDirectAddress = true;
+        v.directAddress    = DirectAddressParser::parse(peek().value);
+        consume(); // потребляем DIRECT_ADDR
+    }
+
     expect(TokenType::COLON);
     v.type = parseType();
+
+    // Проверка совместимости адреса и типа
+    if (v.hasDirectAddress)
+        validateAddressType(v.directAddress, v.type, v.name);
 
     // Начальное значение
     if (match(TokenType::ASSIGN)) {
@@ -141,21 +160,45 @@ VarDecl Parser::parseVarDecl(VarDecl::Kind kind) {
                 v.initialValue = std::stof(consume().value);
                 break;
             default:
-                v.initialValue = static_cast<int32_t>(0);
+                v.initialValue = int32_t{0};
                 consume();
         }
     } else {
         switch (v.type) {
-            case IECType::BOOL:   v.initialValue = false;              break;
-            case IECType::INT:    v.initialValue = int16_t{0};         break;
-            case IECType::DINT:   v.initialValue = int32_t{0};         break;
-            case IECType::REAL:   v.initialValue = 0.0f;               break;
-            default:              v.initialValue = int32_t{0};         break;
+            case IECType::BOOL:  v.initialValue = false;      break;
+            case IECType::INT:   v.initialValue = int16_t{0}; break;
+            case IECType::DINT:  v.initialValue = int32_t{0}; break;
+            case IECType::REAL:  v.initialValue = 0.0f;       break;
+            default:             v.initialValue = int32_t{0}; break;
         }
     }
 
     expect(TokenType::SEMICOLON);
     return v;
+}
+
+void Parser::validateAddressType(const DirectAddress& addr,
+                                  IECType type,
+                                  const std::string& name)
+{
+    bool ok = false;
+    switch (addr.size) {
+        case DirectAddressSize::BIT:
+            ok = (type == IECType::BOOL);
+            break;
+        case DirectAddressSize::BYTE:
+            ok = (type == IECType::INT || type == IECType::BOOL);
+            break;
+        case DirectAddressSize::WORD:
+            ok = (type == IECType::INT || type == IECType::BOOL);
+            break;
+        case DirectAddressSize::DWORD:
+            ok = (type == IECType::DINT || type == IECType::REAL);
+            break;
+    }
+    if (!ok)
+        error("AT variable '" + name +
+              "': address size incompatible with declared type");
 }
 
 ILInstruction Parser::parseInstruction() {

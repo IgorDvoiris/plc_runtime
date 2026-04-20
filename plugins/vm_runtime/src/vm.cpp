@@ -2,9 +2,8 @@
 #include "vm.hpp"
 #include <stdexcept>
 #include <cstring>
-#include <iostream>
 
-void VirtualMachine::loadPOU(const POUBytecode& pou) {  
+void VirtualMachine::loadPOU(const POUBytecode& pou) {
     pous_[pou.name] = pou;
 }
 
@@ -13,16 +12,53 @@ void VirtualMachine::setIOCallbacks(IOReadFn reader, IOWriteFn writer) {
     ioWrite_ = std::move(writer);
 }
 
+uint16_t VirtualMachine::resolveVarIndex(const std::string& pouName,
+                                          const std::string& varName) const
+{
+    auto pit = pous_.find(pouName);
+    if (pit == pous_.end()) return INVALID_VAR_INDEX;
+
+    auto vit = pit->second.varMap.find(varName);
+    if (vit == pit->second.varMap.end()) return INVALID_VAR_INDEX;
+
+    return vit->second;
+}
+
+void VirtualMachine::setVarByIndex(const std::string& pouName,
+                                    uint16_t index,
+                                    const Value& value)
+{
+    // Если фрейм ещё не создан — инициализируем его
+    auto fit = frameCache_.find(pouName);
+    if (fit == frameCache_.end()) {
+        auto pit = pous_.find(pouName);
+        if (pit == pous_.end()) return;
+
+        ExecutionFrame frame;
+        initFrame(frame, pit->second);
+        frameCache_[pouName] = frame;
+        fit = frameCache_.find(pouName);
+    }
+
+    if (index >= MAX_VARS) return;
+    fit->second.vars[index] = value;
+}
+
+Value VirtualMachine::getVarByIndex(const std::string& pouName,
+                                     uint16_t index) const
+{
+    auto fit = frameCache_.find(pouName);
+    if (fit == frameCache_.end()) return Value{};
+    if (index >= MAX_VARS)        return Value{};
+    return fit->second.vars[index];
+}
+
 Value VirtualMachine::getVar(const std::string& pouName,
                               const std::string& varName) const
 {
-    auto pit = pous_.find(pouName);
-    if (pit == pous_.end()) return Value{};
-    auto vit = pit->second.varMap.find(varName);
-    if (vit == pit->second.varMap.end()) return Value{};
-    auto fit = frameCache_.find(pouName);
-    if (fit == frameCache_.end()) return Value{};
-    return fit->second.vars[vit->second];
+    uint16_t idx = resolveVarIndex(pouName, varName);
+    if (idx == INVALID_VAR_INDEX) return Value{};
+    return getVarByIndex(pouName, idx);
 }
 
 void VirtualMachine::executeCycle(const std::string& programName) {
