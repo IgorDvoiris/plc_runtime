@@ -1,6 +1,7 @@
 // plugins/vm_runtime/include/VmProgram.hpp
 #pragma once
 #include "VmRawBuffer.hpp"
+#include "io_mapper.hpp"
 #include "core/IScheduler.hpp"
 #include <string>
 #include <memory>
@@ -24,5 +25,6 @@ private:
     std::string   instanceName_;
     VmRawBuffer& rawBuf_;
 
+    std::unique_ptr<IOMapper> iomapper_;
     std::unique_ptr<VirtualMachine> vm_;
 };

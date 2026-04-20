@@ -2,7 +2,7 @@
 #pragma once
 #include "io_binding.hpp"
 #include "vm.hpp"
-#include "../platform/io_driver.hpp"
+#include "io_driver.hpp"
 #include "direct_address_parser.hpp"
 #include <vector>
 #include <unordered_map>
@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <algorithm>
 #include <functional>
+#include <iostream>
 
 // Колбэк для обработки ошибок IO (не бросает исключений в цикле)
 using IOErrorHandler = std::function<void(
@@ -25,7 +26,7 @@ public:
                         IIODriver* driver)
     {
         if (!driver)
-            throw std::invalid_argument("Driver is null: " + name);
+            throw std::invalid_argument("[iomapper] Driver is null: " + name);
         drivers_[name] = driver;
     }
 
@@ -50,10 +51,14 @@ public:
     // ── Инициализация (вызывается один раз перед запуском) ────
     void initialize() {
         // Инициализируем все драйверы
+        if (drivers_.empty()) {
+            std::cout << "[iomapper] Drivers are empty" << "\n";
+            return;
+        }
         for (auto& kv : drivers_) {
             if (!kv.second->init())
                 throw std::runtime_error(
-                    "IO driver init failed: " + kv.first);
+                    "[iomapper] IO driver init failed: " + kv.first);
         }
 
         // Кэшируем индексы переменных
@@ -172,6 +177,9 @@ public:
                 binding.ioAddr.bus     = 0;
                 binding.ioAddr.device  = 0;
                 binding.ioAddr.channel = encodeChannel(da);
+
+                std::cout << "[iomapper] iomapper_->autoBindDirectAddresses "  << " pou: " << binding.pouName << " index: "
+                    <<  binding.varIndex << " name: " << binding.varName << "\n";
 
                 bindings_.push_back(std::move(binding));
             }

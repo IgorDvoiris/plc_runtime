@@ -25,6 +25,7 @@ target_include_directories(vm_runtime
     PRIVATE
         include
         compiler
+        include/platform
         ${PROJECT_SOURCE_DIR}/../../     # путь до core/
 )
 
