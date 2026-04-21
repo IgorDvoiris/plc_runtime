@@ -23,7 +23,7 @@ bool VmProgram::load(const std::string& soPath) {
 
         iomapper_ = std::make_unique<IOMapper>(*vm_);
 
-        GpioDriver gpio(
+        GpioDriver::getInstance().configure(
             // read: симуляция чтения GPIO
             [](uint16_t pin) -> bool {
                 (void)pin;
@@ -36,7 +36,7 @@ bool VmProgram::load(const std::string& soPath) {
             }
         );
 
-        iomapper_->registerDriver("gpio", &gpio);
+        iomapper_->registerDriver("gpio", &GpioDriver::getInstance());
         // ── Автоматическая привязка AT-переменных ─────────────────
         // Для INPUT (%I) и OUTPUT (%Q) возвращаем gpioDriver,
         // для MEMORY (%M) — nullptr (внутренняя переменная, IO не нужен)
@@ -45,7 +45,7 @@ bool VmProgram::load(const std::string& soPath) {
                 switch (pfx) {
                     case DirectAddressPrefix::INPUT:
                     case DirectAddressPrefix::OUTPUT:
-                        return &gpio;
+                        return &GpioDriver::getInstance();
                     case DirectAddressPrefix::MEMORY:
                         return nullptr; // %M — только внутренняя память
                 }
