@@ -24,15 +24,58 @@ bool VmProgram::load(const std::string& soPath) {
         iomapper_ = std::make_unique<IOMapper>(*vm_);
 
         GpioDriver::getInstance().configure(
-            // read: симуляция чтения GPIO
-            [](uint16_t pin) -> bool {
-                (void)pin;
-                std::cout << "GPIO>[" << pin << "] = " << false << "\n";
-                return false; // TODO: реальное чтение
+            // ── READ ──────────────────────────────────────────────
+            [](uint16_t channel, DirectAddressSize size) -> Value {
+                auto da = IOMapper::decodeChannel(channel);
+                std::cout << "rGPIO>[" << channel << " (" << da.toString() << ", size="
+                        << static_cast<int>(size) << ")]";
+
+                switch (size) {
+                    case DirectAddressSize::BIT: {
+                        // TODO: to be removed. Simulation.
+                        bool val = (da.byteAddr == 0 && da.bitAddr == 0);
+                        std::cout << " = " << val << "\n";
+                        return Value::fromBool(val);
+                    }
+                    case DirectAddressSize::BYTE:
+                        return Value::fromInt(0); // Reserved for SINT/USINT
+
+                    case DirectAddressSize::WORD: {
+                        // TODO: to be removed. Simulation.
+                        if (da.byteAddr == 1) {
+                            std::cout << " = 85 (simulated INT)\n";
+                            return Value::fromInt(85);
+                        }
+                        return Value::fromInt(0);
+                    }
+                    case DirectAddressSize::DWORD:
+                        // %ID4 и т.д.
+                        return Value::fromDInt(0);
+
+                    default:
+                        return Value::fromDInt(0);
+                }
             },
-            // write: симуляция записи GPIO
-            [](uint16_t pin, bool val) {
-                std::cout << "<GPIO[" << pin << "] = " << val << "\n";
+
+            // ── WRITE ─────────────────────────────────────────────
+            [](uint16_t channel, DirectAddressSize size, const Value& val) {
+                auto da = IOMapper::decodeChannel(channel);
+                std::cout << "wGPIO>[" << channel << " (" << da.toString() << ", size="
+                        << static_cast<int>(size) << ")]";
+
+                switch (size) {
+                    case DirectAddressSize::BIT:
+                        std::cout << " = " << val.asBool() << "\n";
+                        break;
+                    case DirectAddressSize::WORD:
+                        std::cout << " = " << static_cast<int16_t>(val.asInt()) << "\n";
+                        break;
+                    case DirectAddressSize::DWORD:
+                        std::cout << " = " << val.asInt() << "\n";
+                        break;
+                    default:
+                        std::cout << " (unsupported type)\n";
+                }
             }
         );
 

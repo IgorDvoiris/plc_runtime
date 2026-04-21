@@ -178,12 +178,33 @@ public:
                 binding.ioAddr.device  = 0;
                 binding.ioAddr.channel = encodeChannel(da);
 
-                std::cout << "[iomapper] iomapper_->autoBindDirectAddresses "  << " pou: " << binding.pouName << " index: "
-                    <<  binding.varIndex << " name: " << binding.varName << "\n";
+                std::cout << "[iomapper] iomapper_->autoBindDirectAddresses "  << " name: " << binding.varName << " index: "
+                    <<  binding.varIndex << " type: " << static_cast<int>(binding.valueType) << "\n";
 
                 bindings_.push_back(std::move(binding));
             }
         }
+    }
+
+    // Кодирование DirectAddress → uint16_t channel
+    // Биты: [size:2][byteAddr:11][bitAddr:3]
+    static uint16_t encodeChannel(const DirectAddress& da) {
+        uint16_t ch = 0;
+        ch |= static_cast<uint16_t>(
+            static_cast<uint8_t>(da.size) & 0x03) << 13;
+        ch |= static_cast<uint16_t>(da.byteAddr  & 0x07FF) << 3;
+        ch |= static_cast<uint16_t>(da.bitAddr   & 0x07);
+        return ch;
+    }
+
+    // Декодирование для драйвера
+    static DirectAddress decodeChannel(uint16_t ch) {
+        DirectAddress da{};
+        da.size     = static_cast<DirectAddressSize>((ch >> 13) & 0x03);
+        da.byteAddr = static_cast<uint16_t>((ch >> 3) & 0x07FF);
+        da.bitAddr  = static_cast<uint8_t>(ch & 0x07);
+        da.hasBit   = (da.size == DirectAddressSize::BIT);
+        return da;
     }
 
 private:
@@ -236,25 +257,5 @@ private:
             errorHandler_(binding, msg);
         }
         // Не бросаем — продолжаем цикл с остальными привязками
-    }
-    // Кодирование DirectAddress → uint16_t channel
-    // Биты: [size:2][byteAddr:11][bitAddr:3]
-    static uint16_t encodeChannel(const DirectAddress& da) {
-        uint16_t ch = 0;
-        ch |= static_cast<uint16_t>(
-            static_cast<uint8_t>(da.size) & 0x03) << 13;
-        ch |= static_cast<uint16_t>(da.byteAddr  & 0x07FF) << 3;
-        ch |= static_cast<uint16_t>(da.bitAddr   & 0x07);
-        return ch;
-    }
-
-    // Декодирование для драйвера
-    static DirectAddress decodeChannel(uint16_t ch) {
-        DirectAddress da{};
-        da.size     = static_cast<DirectAddressSize>((ch >> 13) & 0x03);
-        da.byteAddr = static_cast<uint16_t>((ch >> 3) & 0x07FF);
-        da.bitAddr  = static_cast<uint8_t>(ch & 0x07);
-        da.hasBit   = (da.size == DirectAddressSize::BIT);
-        return da;
     }
 };

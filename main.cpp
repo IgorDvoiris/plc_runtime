@@ -164,7 +164,11 @@ int main(int argc, char* argv[]) {
     taskManager->addToTask("StatusTask", &motorStatusTask);
 
     if (monitor) {
+#if 0
         monitor->watchTask("IecTask",    20,  30);
+#else
+        monitor->watchTask("VmTask",    20,  30);
+#endif
         monitor->watchTask("StatusTask", 100, 15);
 
         taskManager->setTickCallback(
