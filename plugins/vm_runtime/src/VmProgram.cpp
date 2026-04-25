@@ -10,7 +10,7 @@
 VmProgram::VmProgram(const std::string& instanceName, VmRawBuffer& rawBuf)
     : instanceName_(instanceName), rawBuf_(rawBuf) {}
 
-bool VmProgram::load(const std::string& soPath) {
+bool VmProgram::load(const std::string& soPath, ISimulation* sim) {
     std::cout << "[VmProgram] " << instanceName_ << "] loading " << soPath << "\n";
     try {
         vm_ = std::make_unique<VirtualMachine>();
@@ -23,6 +23,7 @@ bool VmProgram::load(const std::string& soPath) {
 
         iomapper_ = std::make_unique<IOMapper>(*vm_);
 
+#if 0
         GpioDriver::getInstance().configure(
             // ── READ ──────────────────────────────────────────────
             [](uint16_t channel, DirectAddressSize size) -> Value {
@@ -78,7 +79,16 @@ bool VmProgram::load(const std::string& soPath) {
                 }
             }
         );
-
+#else
+        GpioDriver::getInstance().configure(
+            [sim](uint16_t ch, DirectAddressSize sz) { 
+                return sim->read(ch, static_cast<uint8_t>(sz)); 
+            },
+            [sim](uint16_t ch, DirectAddressSize sz, const Value& v) { 
+                sim->write(ch, static_cast<uint8_t>(sz), v); 
+            }
+        );
+#endif
         iomapper_->registerDriver("gpio", &GpioDriver::getInstance());
         // ── Автоматическая привязка AT-переменных ─────────────────
         // Для INPUT (%I) и OUTPUT (%Q) возвращаем gpioDriver,
@@ -107,7 +117,9 @@ bool VmProgram::load(const std::string& soPath) {
 
 void VmProgram::tick() {
     iomapper_->readInputs();
+    //std::cout << "[VmProgram] VM PLC Runtime begin\n";    
     vm_->executeCycle(instanceName_);
+    //std::cout << "[VmProgram] VM PLC Runtime end\n";    
     iomapper_->writeOutputs();
 }
 

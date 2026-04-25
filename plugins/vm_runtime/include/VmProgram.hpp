@@ -3,6 +3,7 @@
 #include "VmRawBuffer.hpp"
 #include "io_mapper.hpp"
 #include "core/IScheduler.hpp"
+#include "core/ISimulation.hpp"
 #include <string>
 #include <memory>
 
@@ -14,7 +15,7 @@ public:
     explicit VmProgram(const std::string& instanceName, VmRawBuffer& rawBuf);
     ~VmProgram();
 
-    bool load(const std::string& soPath);
+    bool load(const std::string& soPath, ISimulation* sim);
     void tick() override;
 
     const std::string& instanceName() const { return instanceName_; }

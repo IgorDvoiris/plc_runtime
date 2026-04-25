@@ -38,9 +38,13 @@ public:
 
     bool loadProgram(const std::string& soPath,
                      const std::string& instanceName,
-                     const std::string& taskName) override {
+                     const std::string& taskName,
+                     ISimulation* sim) override {
+
+        if (!sim) throw std::runtime_error("Simulation service required");
+                 
         auto prog = std::make_unique<VmProgram>(instanceName, rawBuf_);
-        if (!prog->load(soPath)) return false;
+        if (!prog->load(soPath, sim)) return false;
         if (bus_) {
             try {
                 bus_->getService<ITaskManager>()->addToTask(taskName, prog.get());

@@ -1,37 +1,31 @@
-# plugins/system_monitor/CMakeLists.txt
+# plugins/simulation/CMakeLists.txt
 
 cmake_minimum_required(VERSION 3.16)
-project(vm_runtime_plugin)
+project(simulation_plugin)
 
 set(CMAKE_CXX_STANDARD 20)
 
 # ── SHARED LIBRARY + PIC ─────────────────────────────────────
-add_library(vm_runtime SHARED
-    src/execution_context.cpp
-    src/serializer.cpp
-    src/vm.cpp
-    src/VmProgram.cpp
-    src/VmRuntimePlugin.cpp    
+add_library(simulation SHARED
+    src/SimulationPlugin.cpp
 )
 
 # Position Independent Code — обязателен для .so
-set_target_properties(vm_runtime PROPERTIES
+set_target_properties(simulation PROPERTIES
     POSITION_INDEPENDENT_CODE ON          # -fPIC
-    OUTPUT_NAME "vm_runtime"          # → libsystem_monitor.so
+    OUTPUT_NAME "simulation"              # → libsimulation.so
 )
 
-target_include_directories(vm_runtime
+target_include_directories(simulation
     PRIVATE
         include
-        compiler/compiler
-        include/platform
         ${PROJECT_SOURCE_DIR}/../../     # путь до core/
+        ${PROJECT_SOURCE_DIR}/../vm_runtime/include/
+        ${PROJECT_SOURCE_DIR}/../vm_runtime/include/compiler/
 )
 
-target_compile_options(vm_runtime PRIVATE
+target_compile_options(simulation PRIVATE
     -Wall
     -Wextra
     -fvisibility=hidden                  # экспортируем только extern "C"
 )
-
-target_link_libraries(vm_runtime PRIVATE dl)

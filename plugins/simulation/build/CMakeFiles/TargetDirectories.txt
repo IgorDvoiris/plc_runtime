@@ -1,0 +1,3 @@
+/home/user/Desktop/CODESYS/Claude/git/plc_runtime/plugins/simulation/build/CMakeFiles/simulation.dir
+/home/user/Desktop/CODESYS/Claude/git/plc_runtime/plugins/simulation/build/CMakeFiles/edit_cache.dir
+/home/user/Desktop/CODESYS/Claude/git/plc_runtime/plugins/simulation/build/CMakeFiles/rebuild_cache.dir

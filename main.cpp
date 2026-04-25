@@ -5,9 +5,8 @@
 #include "core/TaskManagerComponent.hpp"
 #include "core/ProcessImage.hpp"
 #include "core/IoBuffer.hpp"
-#include "simulation/MotorSimulation.hpp"
-#include "simulation/MotorControlTask.hpp"
 #include "core/PluginLoader.hpp"
+#include "core/ISimulation.hpp"
 #include "plugins/system_monitor/include/ISystemMonitor.hpp"
 #include "plugins/iec_runtime/include/IIecRuntime.hpp"
 #include "plugins/vm_runtime/include/IVmRuntime.hpp"
@@ -36,11 +35,6 @@ int main(int argc, char* argv[]) {
     ProcessImage processImage;
     IoBuffer     ioBuffer;
 
-    // ── 2. Наблюдатель состояния мотора ───────────────────────────────
-    // Логика управления — в IEC программе MotorControl.
-    // MotorControlTask только читает выходы и печатает сообщения.
-    MotorControlTask motorStatusTask(processImage);
-
     // ── 3. Компоненты runtime ─────────────────────────────────────────
     SchedulerComponent   schedulerComp;
     TaskManagerComponent taskManagerComp;
@@ -54,6 +48,59 @@ int main(int argc, char* argv[]) {
 
     auto* taskManager = bus.getService<ITaskManager>();
     auto* scheduler   = bus.getService<IScheduler>();
+
+    // ── 4. Simulation ──────────────────────────────────────────────
+#if 0
+    PluginLoader simulationLoader;
+    bool         simulationLoaded = false;
+    try {
+        simulationLoader.load("./libsimulation.so", bus);
+        simulationLoaded = true;
+    } catch (const std::exception& e) {
+        std::cerr << "[Main] Simulation: " << e.what() << "\n";
+    }
+
+    ISimulation* simulation = nullptr;
+    if (simulationLoaded) {
+        try { simulation = bus.getService<ISimulation>(); }
+        catch (...) {}
+    }
+
+    if (simulation) {
+        simulation->start();
+    }
+#else
+    void*    simHandle = nullptr;
+    IPlugin* simPlugin = nullptr;
+
+    simHandle = dlopen("./libsimulation.so", RTLD_NOW | RTLD_LOCAL);
+    if (!simHandle) {
+        std::cerr << "[Main] libsimulation.so not found: " << dlerror() << "\n";
+        std::cerr << "[Main] невозможно продолжить без Simulation\n";
+        return 1;
+    }
+
+    using CreateFn  = IPlugin*(*)();
+    using DestroyFn = void(*)(IPlugin*);
+
+    auto createSim  = reinterpret_cast<CreateFn> (dlsym(simHandle, "createPlugin"));
+    auto destroySim = reinterpret_cast<DestroyFn>(dlsym(simHandle, "destroyPlugin"));
+
+    if (!createSim || !destroySim) {
+        std::cerr << "[Main] dlsym failed: " << dlerror() << "\n";
+        dlclose(simHandle);
+        return 1;
+    }
+
+    simPlugin = createSim();
+    if (!simPlugin) {
+        std::cerr << "[Main] Simulation createPlugin() returned null\n";
+        dlclose(simHandle);
+        return 1;
+    }
+
+    simPlugin->init(bus);
+#endif
 
     // ── 4. SystemMonitor ──────────────────────────────────────────────
     PluginLoader monitorLoader;
@@ -78,7 +125,7 @@ int main(int argc, char* argv[]) {
         });
     }
 
-    // ── 5. IEC Runtime ────────────────────────────────────────────────
+    // ── 5. IEC/VM Runtime ────────────────────────────────────────────────
 #if 0
     void*    iecHandle = nullptr;
     IPlugin* iecPlugin = nullptr;
@@ -143,7 +190,7 @@ int main(int argc, char* argv[]) {
     setPi(&processImage);
     vmPlugin = create();
     if (!vmPlugin) {
-        std::cerr << "[Main] createPlugin() returned null\n";
+        std::cerr << "[Main] VM createPlugin() returned null\n";
         dlclose(vmHandle);
         return 1;
     }
@@ -157,11 +204,6 @@ int main(int argc, char* argv[]) {
 #else
     taskManager->createTask("VmTask", 20);
 #endif
-
-
-    // StatusTask: читает выходы и печатает сообщения (100ms достаточно)
-    taskManager->createTask("StatusTask", 100);
-    taskManager->addToTask("StatusTask", &motorStatusTask);
 
     if (monitor) {
 #if 0
@@ -203,7 +245,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    if (!vmRuntime->loadProgram(argv[1], "PumpControl", "VmTask")) {
+    if (!vmRuntime->loadProgram(argv[1], "PumpControl", "VmTask", bus.getService<ISimulation>())) {
         std::cerr << "[Main] loadProgram failed\n";
         destroy(vmPlugin);
         dlclose(vmHandle);
@@ -218,8 +260,7 @@ int main(int argc, char* argv[]) {
     vmPlugin->start();
 #endif
 
-    MotorSimulation simulation(ioBuffer);
-    //simulation.start();
+    simPlugin->start();
 
     std::cout << "\n[Main] running (Ctrl+C to stop)\n\n";
 
@@ -234,37 +275,20 @@ int main(int argc, char* argv[]) {
         const auto nowMs = static_cast<uint64_t>(
             std::chrono::duration_cast<ms>(
                 clock::now().time_since_epoch()).count());
-
-        // Синхронизация IO: входы из симулятора → ProcessImage
-        ioBuffer.copyInputsToProcessImage(processImage);
-// В main.cpp — главный цикл, после copyInputsToProcessImage():
-        // Исполнение всех задач (IecTask + StatusTask)
-        scheduler->tick(nowMs);
-
-        // Синхронизация IO: выходы ProcessImage → симулятор
-        ioBuffer.copyOutputsFromProcessImage(processImage);
 #if 0
-if (nowMs % 5) { //1000 < 10) {
-    std::cout << "[DEBUG 2] t=" << nowMs << "] "
-              << "btnStart=" << (int)processImage.inputs[0]    // %IX0.0
-              << " btnStop="  << (int)processImage.inputs[1]   // %IX0.1
-              << " fault="    << (int)processImage.inputs[2]   // %IX0.2
-              << " | "
-              << "motorRun="  << (int)processImage.outputs[8]  // %QX1.0
-              << " green="    << (int)processImage.outputs[9]  // %QX1.1
-              << " red="      << (int)processImage.outputs[10] // %QX1.2
-              << "\n";
-}
+        ioBuffer.copyInputsToProcessImage(processImage);
+        scheduler->tick(nowMs);
+        ioBuffer.copyOutputsFromProcessImage(processImage);
+#else
+        scheduler->tick(nowMs);
 #endif
+
         std::this_thread::sleep_until(nextTick);
         nextTick += tickInterval;
-
-        //if (!simulation.isRunning()) g_running = false;
     }
 
     // ── 9. Остановка ──────────────────────────────────────────────────
     std::cout << "\n[Main] shutting down...\n";
-    simulation.stop();
     manager.stopAll();
     monitorLoader.unloadAll();
 

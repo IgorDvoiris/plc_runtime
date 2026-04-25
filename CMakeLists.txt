@@ -12,9 +12,10 @@ add_executable(system
     core/TaskManager.cpp
     core/TaskManagerComponent.cpp
     core/PluginLoader.cpp
-    simulation/MotorSimulation.cpp
-    simulation/MotorControlTask.cpp
+    core/value.cpp
 )
+
+set_target_properties(system PROPERTIES ENABLE_EXPORTS TRUE)
 
 target_include_directories(system PRIVATE ${CMAKE_SOURCE_DIR})
 target_compile_options(system PRIVATE -Wall -Wextra -Wpedantic)

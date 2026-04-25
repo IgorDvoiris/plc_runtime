@@ -1,5 +1,5 @@
 // value.cpp
-#include "value.hpp"
+#include <core/value.hpp>
 
 Value Value::fromBool (bool    v) { Value x; x.type=ValueType::BOOL;  x.data.b  = v; return x; }
 Value Value::fromInt  (int16_t v) { Value x; x.type=ValueType::INT;   x.data.i  = v; return x; }
