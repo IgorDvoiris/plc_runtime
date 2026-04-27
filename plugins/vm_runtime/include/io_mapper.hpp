@@ -3,6 +3,7 @@
 #include "io_binding.hpp"
 #include "vm.hpp"
 #include "io_driver.hpp"
+#include <core/io/IIODriver.hpp>
 #include "direct_address_parser.hpp"
 #include <vector>
 #include <unordered_map>

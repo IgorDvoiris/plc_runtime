@@ -1,6 +1,6 @@
 // plugins/vm_runtime/include/VmProgram.hpp
 #pragma once
-#include "VmRawBuffer.hpp"
+
 #include "io_mapper.hpp"
 #include "core/IScheduler.hpp"
 #include <string>
@@ -11,7 +11,7 @@ class ScanCycleManager;
 
 class VmProgram : public ITickable {
 public:
-    explicit VmProgram(const std::string& instanceName, VmRawBuffer& rawBuf);
+    explicit VmProgram(const std::string& instanceName);
     ~VmProgram();
 
     bool load(const std::string& soPath);
@@ -23,7 +23,6 @@ public:
     uint64_t      tickCount_ = 0;
 private:
     std::string   instanceName_;
-    VmRawBuffer& rawBuf_;
 
     std::unique_ptr<IOMapper> iomapper_;
     std::unique_ptr<VirtualMachine> vm_;

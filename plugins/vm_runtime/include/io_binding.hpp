@@ -1,7 +1,9 @@
 // io_binding.hpp
 #pragma once
-#include "value.hpp"
+#include <core/io/value.hpp>
 #include "io_driver.hpp"
+#include <core/io/IIODriver.hpp>
+#include <core/io/IOAddress.hpp>
 #include <string>
 #include <vector>
 #include <cstdint>

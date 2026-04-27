@@ -1,6 +1,8 @@
 // gpio_driver.hpp
 #pragma once
 #include "io_driver.hpp"
+#include <core/io/IIODriver.hpp>
+#include <core/io/IOAddress.hpp>
 #include <functional>
 #include <mutex>
 

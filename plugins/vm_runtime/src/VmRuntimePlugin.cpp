@@ -1,7 +1,6 @@
 // plugins/vm_runtime/src/VmRuntimePlugin.cpp
 #include "IVmRuntime.hpp"
 #include "VmProgram.hpp"
-#include "VmRawBuffer.hpp"
 #include "core/IPlugin.hpp"
 #include "core/SystemBus.hpp"
 #include "core/ITaskManager.hpp"
@@ -15,12 +14,9 @@
 #  define PLUGIN_EXPORT
 #endif
 
-namespace { ProcessImage* g_processImage = nullptr; }
-
 class VmRuntimePlugin final : public IPlugin, public IVmRuntime {
 public:
-    explicit VmRuntimePlugin(ProcessImage& pi)
-        : rawBuf_(pi) {}
+    explicit VmRuntimePlugin() {}
 
     void init(SystemBus& bus) override {
         bus_ = &bus;
@@ -39,7 +35,7 @@ public:
     bool loadProgram(const std::string& soPath,
                      const std::string& instanceName,
                      const std::string& taskName) override {
-        auto prog = std::make_unique<VmProgram>(instanceName, rawBuf_);
+        auto prog = std::make_unique<VmProgram>(instanceName);
         if (!prog->load(soPath)) return false;
         if (bus_) {
             try {
@@ -59,20 +55,13 @@ public:
     size_t programCount() const override { return programs_.size(); }
 
 private:
-    VmRawBuffer rawBuf_;
     std::vector<std::unique_ptr<VmProgram>> programs_;
     SystemBus* bus_ = nullptr;
 };
 
 extern "C" {
-    PLUGIN_EXPORT void setProcessImage(ProcessImage* pi) { g_processImage = pi; }
-
     PLUGIN_EXPORT IPlugin* createPlugin() {
-        if (!g_processImage) {
-            std::cerr << "[VmRuntime] setProcessImage() not called\n";
-            return nullptr;
-        }
-        return new VmRuntimePlugin(*g_processImage);
+        return new VmRuntimePlugin();
     }
 
     PLUGIN_EXPORT void destroyPlugin(IPlugin* p) { delete p; }

@@ -125,22 +125,18 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // Передать ProcessImage в плагин до createPlugin()
-    using SetPiFn   = void(*)(ProcessImage*);
     using CreateFn  = IPlugin*(*)();
     using DestroyFn = void(*)(IPlugin*);
 
-    auto setPi   = reinterpret_cast<SetPiFn>  (dlsym(vmHandle, "setProcessImage"));
     auto create  = reinterpret_cast<CreateFn> (dlsym(vmHandle, "createPlugin"));
     auto destroy = reinterpret_cast<DestroyFn>(dlsym(vmHandle, "destroyPlugin"));
 
-    if (!setPi || !create || !destroy) {
+    if (!create || !destroy) {
         std::cerr << "[Main] dlsym failed: " << dlerror() << "\n";
         dlclose(vmHandle);
         return 1;
     }
 
-    setPi(&processImage);
     vmPlugin = create();
     if (!vmPlugin) {
         std::cerr << "[Main] createPlugin() returned null\n";
@@ -234,7 +230,7 @@ int main(int argc, char* argv[]) {
         const auto nowMs = static_cast<uint64_t>(
             std::chrono::duration_cast<ms>(
                 clock::now().time_since_epoch()).count());
-
+#if 0
         // Синхронизация IO: входы из симулятора → ProcessImage
         ioBuffer.copyInputsToProcessImage(processImage);
 // В main.cpp — главный цикл, после copyInputsToProcessImage():
@@ -243,18 +239,8 @@ int main(int argc, char* argv[]) {
 
         // Синхронизация IO: выходы ProcessImage → симулятор
         ioBuffer.copyOutputsFromProcessImage(processImage);
-#if 0
-if (nowMs % 5) { //1000 < 10) {
-    std::cout << "[DEBUG 2] t=" << nowMs << "] "
-              << "btnStart=" << (int)processImage.inputs[0]    // %IX0.0
-              << " btnStop="  << (int)processImage.inputs[1]   // %IX0.1
-              << " fault="    << (int)processImage.inputs[2]   // %IX0.2
-              << " | "
-              << "motorRun="  << (int)processImage.outputs[8]  // %QX1.0
-              << " green="    << (int)processImage.outputs[9]  // %QX1.1
-              << " red="      << (int)processImage.outputs[10] // %QX1.2
-              << "\n";
-}
+#else
+        scheduler->tick(nowMs);
 #endif
         std::this_thread::sleep_until(nextTick);
         nextTick += tickInterval;

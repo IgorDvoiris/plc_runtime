@@ -7,8 +7,8 @@
 #include "serializer.hpp"
 #include <iostream>
 
-VmProgram::VmProgram(const std::string& instanceName, VmRawBuffer& rawBuf)
-    : instanceName_(instanceName), rawBuf_(rawBuf) {}
+VmProgram::VmProgram(const std::string& instanceName)
+    : instanceName_(instanceName) {}
 
 bool VmProgram::load(const std::string& soPath) {
     std::cout << "[VmProgram] " << instanceName_ << "] loading " << soPath << "\n";
