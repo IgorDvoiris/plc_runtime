@@ -3,6 +3,7 @@
 
 #include "io_mapper.hpp"
 #include "core/IScheduler.hpp"
+#include "core/SystemBus.hpp"
 #include <string>
 #include <memory>
 
@@ -11,7 +12,7 @@ class ScanCycleManager;
 
 class VmProgram : public ITickable {
 public:
-    explicit VmProgram(const std::string& instanceName);
+    explicit VmProgram(SystemBus* bus_, const std::string& instanceName);
     ~VmProgram();
 
     bool load(const std::string& soPath);
@@ -22,8 +23,8 @@ public:
 
     uint64_t      tickCount_ = 0;
 private:
+    SystemBus* bus_;
     std::string   instanceName_;
-
     std::unique_ptr<IOMapper> iomapper_;
     std::unique_ptr<VirtualMachine> vm_;
 };

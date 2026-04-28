@@ -35,7 +35,7 @@ public:
     bool loadProgram(const std::string& soPath,
                      const std::string& instanceName,
                      const std::string& taskName) override {
-        auto prog = std::make_unique<VmProgram>(instanceName);
+        auto prog = std::make_unique<VmProgram>(bus_, instanceName);
         if (!prog->load(soPath)) return false;
         if (bus_) {
             try {

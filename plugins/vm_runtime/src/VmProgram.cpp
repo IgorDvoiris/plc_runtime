@@ -2,13 +2,14 @@
 #include "io_mapper.hpp"
 #include "gpio_driver.hpp"
 #include "VmProgram.hpp"
+#include "core/IGpioDriverProvider.hpp"
 #include <iostream>
 #include "vm.hpp"
 #include "serializer.hpp"
 #include <iostream>
 
-VmProgram::VmProgram(const std::string& instanceName)
-    : instanceName_(instanceName) {}
+VmProgram::VmProgram(SystemBus* bus, const std::string& instanceName)
+    : bus_(bus), instanceName_(instanceName) {}
 
 bool VmProgram::load(const std::string& soPath) {
     std::cout << "[VmProgram] " << instanceName_ << "] loading " << soPath << "\n";
@@ -22,7 +23,7 @@ bool VmProgram::load(const std::string& soPath) {
         }
 
         iomapper_ = std::make_unique<IOMapper>(*vm_);
-
+#if 0
         GpioDriver::getInstance().configure(
             // ── READ ──────────────────────────────────────────────
             [](uint16_t channel, DirectAddressSize size) -> Value {
@@ -78,7 +79,16 @@ bool VmProgram::load(const std::string& soPath) {
                 }
             }
         );
-
+#else
+        IIODriver* gpioDrv = nullptr;
+        try {
+            gpioDrv = bus_->getService<IGpioDriverProvider>()->gpioDriver();
+        } catch (const std::exception& e) {
+            std::cerr << "[VmProgram] GPIO driver not available: " << e.what() << "\n";
+            // Решение: продолжить без драйвера (read=0, write игнорируется)
+            // или вернуть false — на усмотрение проекта
+        }
+#endif
         iomapper_->registerDriver("gpio", &GpioDriver::getInstance());
         // ── Автоматическая привязка AT-переменных ─────────────────
         // Для INPUT (%I) и OUTPUT (%Q) возвращаем gpioDriver,
@@ -88,7 +98,7 @@ bool VmProgram::load(const std::string& soPath) {
                 switch (pfx) {
                     case DirectAddressPrefix::INPUT:
                     case DirectAddressPrefix::OUTPUT:
-                        return &GpioDriver::getInstance();
+                        return gpioDrv;
                     case DirectAddressPrefix::MEMORY:
                         return nullptr; // %M — только внутренняя память
                 }

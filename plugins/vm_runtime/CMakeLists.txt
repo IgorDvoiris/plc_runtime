@@ -1,4 +1,4 @@
-# plugins/system_monitor/CMakeLists.txt
+# plugins/simulator/CMakeLists.txt
 
 cmake_minimum_required(VERSION 3.16)
 project(vm_runtime_plugin)
